@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    networks:
+      - ft_transcendence
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: on-failure
+
+
+  # redis
+  redis:
+    image: redis:latest
+    container_name: redis
+    networks:
+      - ft_transcendence
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: on-failure
+
+  # frontend
+  frontend:
+    build: frontend
+    hostname: frontend
+    container_name: frontend
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${FRONTEND}"]
+      interval: 10s
+      timeout: 5s
+      retries: 120
+      start_period: 20s
+    networks:
+      - ft_transcendence
+    restart: on-failure
+  
+ # backend
+  backend:
+    build: backend
+    hostname: backend
+    container_name: backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${BACKEND}/admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 120
+      start_period: 20s
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - ft_transcendence
+    restart: on-failure
+  
+  # monitoring_system
+  monitoring_system:
+    build: monitoring_system
+    hostname: monitoring
+    container_name: monitoring_system
+    ports:
+      - "3030:3030"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ft_transcendence
+    restart: on-failure
+    env_file:
+      - .env
+  
+  # nginx
+  nginx:
+    build: nginx
+    hostname: nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - ft_transcendence
+    restart: on-failure
+
+volumes:
+  postgres-volume: {}
+
+networks:
+  ft_transcendence:
+    name : ft_transcendence

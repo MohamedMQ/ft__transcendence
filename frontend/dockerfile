@@ -1,0 +1,10 @@
+FROM node:lts-bullseye
+
+# Set working directory
+WORKDIR /frontend
+
+COPY . .
+
+RUN npm install
+
+CMD ["npm", "run", "dev"]
